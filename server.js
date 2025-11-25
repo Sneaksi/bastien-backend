@@ -1,7 +1,6 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import nodemailer from "nodemailer";
 import Stripe from "stripe";
 import mongoose from "mongoose";
 
@@ -12,68 +11,68 @@ app.use(cors());
 app.use(express.json());
 
 // -------------------------
-//  1. CONNECT TO MONGODB
+//  MONGO
 // -------------------------
 mongoose
-  .connect(process.env.MONGO_URL, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-  })
+  .connect(process.env.MONGO_URL)
   .then(() => console.log("MongoDB connecté ✔"))
   .catch((err) => console.error("Erreur MongoDB ❌", err));
 
 // -------------------------
-//  2. STRIPE
+// STRIPE
 // -------------------------
 const stripe = new Stripe(process.env.STRIPE_SECRET);
 
 // -------------------------
-//  3. MAILJET — SMTP TRANSPORT
+// MAILJET API (pas SMTP !)
 // -------------------------
-const transporter = nodemailer.createTransport({
-  host: process.env.MAIL_HOST,        // in-v3.mailjet.com
-  port: Number(process.env.MAIL_PORT), // 587
-  secure: false,                      // IMPORTANT → false pour 587
-  auth: {
-    user: process.env.MAILJET_API_KEY,
-    pass: process.env.MAILJET_SECRET_KEY
-  },
-  tls: {
-    rejectUnauthorized: false
-  }
+import Mailjet from "node-mailjet";
+
+const mailjet = new Mailjet({
+  apiKey: process.env.MAILJET_API_KEY,
+  apiSecret: process.env.MAILJET_SECRET_KEY,
 });
 
 // -------------------------
-//  ROUTE TEST EMAIL
+//   TEST EMAIL
 // -------------------------
 app.get("/test-email", async (req, res) => {
   try {
-    console.log("📨 Tentative d'envoi de mail...");
+    const response = await mailjet
+      .post("send", { version: "v3.1" })
+      .request({
+        Messages: [
+          {
+            From: {
+              Email: process.env.MAIL_FROM,
+              Name: "Boutique Bastien",
+            },
+            To: [
+              {
+                Email: process.env.MAIL_FROM,
+              },
+            ],
+            Subject: "Test email via API ✔",
+            TextPart: "Ton backend fonctionne ENFIN 😎",
+            HTMLPart:
+              "<h2>Mail envoyé via Mailjet API depuis Render ✔</h2><p>Tu gères 🔥</p>",
+          },
+        ],
+      });
 
-    const info = await transporter.sendMail({
-      from: process.env.MAIL_FROM,
-      to: process.env.MAIL_FROM,
-      subject: "Test email depuis Render ✔",
-      text: "Ton backend envoie des mails parfaitement 😎",
-    });
+    console.log("Email envoyé ✔", response.body);
 
-    console.log("Email envoyé :", info);
-    res.send("Email envoyé ✔");
+    res.send("Email envoyé via API ✔");
   } catch (error) {
-    console.error("Erreur d’envoi ❌", error);
-    res.status(500).send("Erreur SMTP : " + error.message);
+    console.error("Erreur API Mailjet ❌", error);
+    res.status(500).send("Erreur API : " + error.message);
   }
 });
 
-// -------------------------
-//  ROUTE ACCUEIL
 // -------------------------
 app.get("/", (req, res) => {
   res.send("Backend en ligne ✔");
 });
 
-// -------------------------
-//  LANCEMENT SERVEUR
-// -------------------------
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Serveur démarré sur ${PORT} ✔`));
