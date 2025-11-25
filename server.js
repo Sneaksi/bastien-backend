@@ -1,86 +1,72 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const nodemailer = require('nodemailer');
-const mongoose = require('mongoose');
+import express from "express";
+import mongoose from "mongoose";
+import cors from "cors";
+import dotenv from "dotenv";
+import nodemailer from "nodemailer";
+import Stripe from "stripe";
+
+dotenv.config();
 
 const app = express();
 app.use(express.json());
 app.use(cors());
 
-// =========================
-//  MongoDB Connection
-// =========================
-mongoose.connect(process.env.MONGO_URL)
+// -----------------------------
+// 🔗 CONNECT MONGODB
+// -----------------------------
+mongoose
+  .connect(process.env.MONGO_URL, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+  })
   .then(() => console.log("MongoDB connecté ✔"))
-  .catch(err => console.error("Erreur MongoDB ❌", err));
+  .catch((err) => console.error("Erreur MongoDB:", err));
 
-// =========================
-//  Root Route
-// =========================
-app.get('/', (req, res) => {
-  res.send('Backend en ligne ✔');
-});
+// -----------------------------
+// 💳 STRIPE
+// -----------------------------
+const stripe = new Stripe(process.env.STRIPE_SECRET);
 
-// =========================
-//  Test Email Route
-// =========================
-app.get('/test-email', async (req, res) => {
-  try {
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.MAIL_USER,
-        pass: process.env.MAIL_PASS
-      }
-    });
-
-    const info = await transporter.sendMail({
-      from: `"Bastien Shop" <${process.env.MAIL_USER}>`,
-      to: process.env.MAIL_USER,
-      subject: "Test Email ✔",
-      text: "Ton serveur mail fonctionne parfaitement !",
-    });
-
-    res.send("Email envoyé ✔");
-  } catch (error) {
-    console.error(error);
-    res.status(500).send("Erreur lors de l'envoi ❌");
+// -----------------------------
+// 📧 MAILJET SMTP (Nodemailer)
+// -----------------------------
+const transporter = nodemailer.createTransport({
+  host: process.env.MAIL_HOST, // in-v3.mailjet.com
+  port: Number(process.env.MAIL_PORT), // 587
+  secure: false,
+  auth: {
+    user: process.env.MAIL_USER,  // API Key
+    pass: process.env.MAIL_PASS   // Secret Key
   }
 });
 
-// =========================
-//  Stripe Checkout Example
-// =========================
-const Stripe = require("stripe");
-const stripe = Stripe(process.env.STRIPE_SECRET);
-
-app.post("/create-checkout-session", async (req, res) => {
+// Route test email
+app.get("/test-email", async (req, res) => {
   try {
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      mode: 'payment',
-      line_items: req.body.items.map(item => ({
-        price_data: {
-          currency: 'eur',
-          product_data: { name: item.name },
-          unit_amount: item.price * 100,
-        },
-        quantity: item.quantity,
-      })),
-      success_url: process.env.SUCCESS_URL,
-      cancel_url: process.env.CANCEL_URL,
+    await transporter.sendMail({
+      from: process.env.MAIL_FROM, // ton mail gmail
+      to: process.env.MAIL_FROM,   // tu te l’envoies à toi
+      subject: "Test Mailjet ✔",
+      text: "Félicitations Bastien, ton backend envoie des emails ! 🎉"
     });
 
-    res.json({ url: session.url });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.send("Email envoyé !");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Erreur email :" + err.message);
   }
 });
 
-// =========================
-//  Port (Render)
-// =========================
+// -----------------------------
+// 🏠 HOME
+// -----------------------------
+app.get("/", (req, res) => {
+  res.send("Backend en ligne ✔");
+});
+
+// -----------------------------
+// 🚀 START SERVER
+// -----------------------------
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`Serveur démarré sur ${PORT} ✔`);
