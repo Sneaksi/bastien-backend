@@ -6,6 +6,7 @@ import nodemailer from "nodemailer";
 import mongoose from "mongoose";
 
 dotenv.config();
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -45,13 +46,15 @@ async function sendEmail({ to, subject, text, html }) {
 const stripe = new Stripe(process.env.STRIPE_SECRET);
 
 // ------------------------------
-// 4) ROUTE DE TEST
+// 4) ROUTES BASIQUES
 // ------------------------------
 app.get("/", (req, res) => {
   res.send("Backend en ligne ✔");
 });
 
-// ➤ TEST EMAIL
+// ------------------------------
+// 5) TEST EMAIL
+// ------------------------------
 app.get("/test-email", async (req, res) => {
   try {
     await sendEmail({
@@ -68,7 +71,7 @@ app.get("/test-email", async (req, res) => {
 });
 
 // ------------------------------
-// 5) ROUTE STRIPE (paiement)
+// 6) ROUTE STRIPE (paiement)
 // ------------------------------
 app.post("/create-checkout-session", async (req, res) => {
   try {
@@ -78,9 +81,7 @@ app.post("/create-checkout-session", async (req, res) => {
       line_items: req.body.items.map((item) => ({
         price_data: {
           currency: "eur",
-          product_data: {
-            name: item.name,
-          },
+          product_data: { name: item.name },
           unit_amount: item.price * 100,
         },
         quantity: item.quantity,
@@ -97,7 +98,7 @@ app.post("/create-checkout-session", async (req, res) => {
 });
 
 // ------------------------------
-// 6) PORT RENDER
+// 7) PORT RENDER
 // ------------------------------
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Serveur démarré sur ${PORT} ✔`));
