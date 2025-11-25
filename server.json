@@ -1,0 +1,70 @@
+import express from "express";
+import cors from "cors";
+import mongoose from "mongoose";
+import Stripe from "stripe";
+import nodemailer from "nodemailer";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+// Test route
+app.get("/", (req, res) => res.send("Backend en ligne ✔"));
+
+// MongoDB
+mongoose.connect(process.env.MONGO_URL)
+  .then(() => console.log("MongoDB connecté"))
+  .catch(err => console.log("Erreur Mongo :", err));
+
+// Stripe
+const stripe = new Stripe(process.env.STRIPE_SECRET);
+
+app.post("/api/checkout", async (req, res) => {
+  const items = req.body.items;
+
+  const line_items = items.map(item => ({
+    price_data: {
+      currency: "eur",
+      product_data: { name: item.name },
+      unit_amount: item.price * 100,
+    },
+    quantity: item.quantity,
+  }));
+
+  const session = await stripe.checkout.sessions.create({
+    payment_method_types: ["card"],
+    mode: "payment",
+    line_items,
+    success_url: process.env.SUCCESS_URL,
+    cancel_url: process.env.CANCEL_URL,
+  });
+
+  res.json({ url: session.url });
+});
+
+// Contact form
+app.post("/api/contact", async (req, res) => {
+  const { name, email, subject, message } = req.body;
+
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.MAIL_USER,
+      pass: process.env.MAIL_PASS
+    }
+  });
+
+  await transporter.sendMail({
+    from: email,
+    to: process.env.MAIL_USER,
+    subject: `Nouveau message : ${subject}`,
+    text: `Nom : ${name}\nEmail : ${email}\nMessage : ${message}`
+  });
+
+  res.json({ success: true });
+});
+
+app.listen(3000, () => console.log("Serveur OK sur Render"));
